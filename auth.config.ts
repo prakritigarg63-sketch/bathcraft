@@ -16,6 +16,14 @@ import Google from "next-auth/providers/google";
  * Routes that require a signed-in user. `/bathrooms` and `/onboarding` exist
  * today; the rest are listed so they are protected from the moment someone
  * builds them, rather than shipping open and being noticed later.
+ *
+ * `/planner` is deliberately NOT here. The studio is the product demo: someone
+ * can measure a room, try layouts and reach a costed plan without an account,
+ * and their work lives in their own browser until they choose to keep it (see
+ * lib/planner/db/guest.ts). Authentication is asked for at the point of value —
+ * save, download, share — not at the door. Nothing under /planner reads another
+ * user's data: the server actions it calls still resolve the user id from the
+ * session and refuse anonymous callers, so the boundary has moved, not gone.
  */
 export const PROTECTED_PREFIXES = [
   "/bathrooms",
@@ -23,7 +31,6 @@ export const PROTECTED_PREFIXES = [
   "/my-plans",
   "/onboarding",
   "/account",
-  "/planner",
 ] as const;
 
 export const isProtected = (pathname: string) =>
