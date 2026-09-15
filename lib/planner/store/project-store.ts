@@ -131,7 +131,7 @@ function schedulePersist(project: Project) {
 }
 
 // Remember which project was last open so a reload reopens it (not just "latest").
-const LAST_OPENED_KEY = "bathcraft.lastProjectId";
+const LAST_OPENED_KEY = "milagro.lastProjectId";
 function rememberOpened(id: string | null) {
   try {
     if (id) window.localStorage.setItem(LAST_OPENED_KEY, id);

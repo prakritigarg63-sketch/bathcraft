@@ -1,5 +1,5 @@
 /**
- * BathCraft domain model — the shared vocabulary for the whole app.
+ * Milagro Universe domain model — the shared vocabulary for the whole app.
  * All physical measurements are stored in INCHES internally; unit display
  * (imperial/metric) is a presentation concern handled at the edges.
  */
