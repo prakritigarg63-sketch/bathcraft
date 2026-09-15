@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Icon from "@/components/ui/Icon";
 import { useT } from "@/lib/i18n/useT";
 import { useProjectStore } from "@/lib/planner/store/project-store";
@@ -9,6 +9,7 @@ import { StudioShell } from "@/components/planner/studio/StudioShell";
 import { StepFooter } from "@/components/planner/studio/StepFooter";
 import { AffixInput } from "@/components/planner/studio/AffixInput";
 import { formatInr } from "@/lib/planner/units";
+import { generateEstimate } from "@/lib/planner/estimate/engine";
 import type { CostTier } from "@/lib/planner/types";
 
 /**
@@ -68,14 +69,68 @@ export default function BudgetPage() {
 
   const [draft, setDraft] = useState<string | null>(null);
   const [skipped, setSkipped] = useState(false);
+  const [clamped, setClamped] = useState(false);
 
   const tier = project?.style.costTier ?? null;
   const budget = project?.style.budgetInr ?? 0;
 
+  /**
+   * What each tier actually costs for THIS bathroom.
+   *
+   * Priced through the real estimator rather than from a table of round
+   * numbers, so the floor follows rates.ts instead of drifting from it. And it
+   * is this room: a powder room and a master bath get different floors for the
+   * same tier, which is the only thing that makes quoting a figure honest.
+   */
+  const tierFloor = useMemo(() => {
+    if (!project) return null;
+    return Object.fromEntries(
+      TIERS.map((item) => [
+        item.id,
+        generateEstimate(
+          project.room,
+          { ...project.style, costTier: item.id },
+          project.fixtures,
+          project.addOns,
+        ).totalCostInr,
+      ]),
+    ) as Record<CostTier, number>;
+  }, [project]);
+
+  const floor = tier && tierFloor ? tierFloor[tier] : 0;
+
+  /**
+   * A target under the floor is not a preference, it is a contradiction: the
+   * tier has already decided which products get specified, and this is what
+   * those products cost in this room. Accepting the number would only move the
+   * disappointment to the estimate screen, so raise it and say why.
+   */
   function commitBudget(raw: string) {
     const digits = Number(raw.replace(/[^\d]/g, ""));
-    if (Number.isFinite(digits) && digits > 0) setBudget(digits);
+    if (!Number.isFinite(digits) || digits <= 0) {
+      setDraft(null);
+      return;
+    }
+    const below = floor > 0 && digits < floor;
+    setBudget(below ? floor : digits);
+    setClamped(below);
+    setSkipped(false);
     setDraft(null);
+  }
+
+  /** Choosing a tier seeds an empty target and lifts one that is now too low. */
+  function chooseTier(next: CostTier) {
+    setCostTier(next);
+    const nextFloor = tierFloor?.[next] ?? 0;
+    if (nextFloor <= 0) return;
+    if (budget <= 0) {
+      setBudget(nextFloor);
+      setClamped(false);
+    } else if (budget < nextFloor) {
+      setBudget(nextFloor);
+      setClamped(true);
+    }
+    setSkipped(false);
   }
 
   return (
@@ -104,7 +159,7 @@ export default function BudgetPage() {
             <button
               key={item.id}
               type="button"
-              onClick={() => setCostTier(item.id)}
+              onClick={() => chooseTier(item.id)}
               aria-pressed={active}
               className={[
                 "relative flex flex-col rounded-2xl border p-5 text-left transition-[border-color,transform,box-shadow] duration-200",
@@ -133,6 +188,12 @@ export default function BudgetPage() {
               <span className="mt-1 block text-[13px] leading-relaxed text-body">
                 {t(item.blurb)}
               </span>
+
+              {tierFloor && (
+                <span className="mt-3 block text-[12.5px] font-semibold tabular-nums text-ink">
+                  {t("From")} {formatInr(tierFloor[item.id])}
+                </span>
+              )}
 
               <ul className="mt-3 space-y-1">
                 {item.detail.map((d) => (
@@ -166,6 +227,7 @@ export default function BudgetPage() {
             onValueChange={(v) => {
               setDraft(v);
               setSkipped(false);
+              setClamped(false);
             }}
             onCommit={commitBudget}
           />
@@ -182,7 +244,12 @@ export default function BudgetPage() {
           </button>
         </div>
 
-        {skipped ? (
+        {clamped && floor > 0 ? (
+          <p className="mt-3 text-[12.5px] leading-relaxed text-clay" role="status">
+            {t("This tier starts at")} {formatInr(floor)} —{" "}
+            {t("we’ve set your target there. Choose a lower tier to spend less.")}
+          </p>
+        ) : skipped ? (
           <p className="mt-3 text-[12.5px] text-body-soft" role="status">
             {t("No problem — we’ll still show a full estimate.")}
           </p>
@@ -190,6 +257,7 @@ export default function BudgetPage() {
           budget > 0 && (
             <p className="mt-3 text-[12.5px] text-body-soft" role="status">
               {t("Target")}: {formatInr(budget)}
+              {floor > 0 && <> · {t("minimum for this tier")} {formatInr(floor)}</>}
             </p>
           )
         )}

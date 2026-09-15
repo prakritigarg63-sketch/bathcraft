@@ -266,6 +266,14 @@ export interface StudioFields {
   projectType?: ProjectType;
   doorDetail?: DoorDetail;
   extraOpenings?: ExtraOpening[];
+  /**
+   * Set when the room has no window at all.
+   *
+   * Distinct from "no window has been placed yet", which is the same absence
+   * for an entirely different reason. Without this the step cannot tell a
+   * windowless bathroom from an unfinished one, so it has to keep asking.
+   */
+  noWindow?: boolean;
   plumbing?: PlumbingPoint[];
   plumbingIntent?: PlumbingIntent;
   selectedLayoutId?: LayoutOptionId;

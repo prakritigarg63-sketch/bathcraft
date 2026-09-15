@@ -63,6 +63,7 @@ export default function OpeningsPage() {
   const t = useT();
   const { project } = useEnsureProject();
   const setDoor = useProjectStore((s) => s.setDoor);
+  const setNoWindow = useProjectStore((s) => s.setNoWindow);
   const addExtraOpening = useProjectStore((s) => s.addExtraOpening);
   const updateExtraOpening = useProjectStore((s) => s.updateExtraOpening);
   const removeExtraOpening = useProjectStore((s) => s.removeExtraOpening);
@@ -75,6 +76,7 @@ export default function OpeningsPage() {
 
   const room = project?.room;
   const extras = project?.extraOpenings ?? [];
+  const noWindow = project?.noWindow ?? false;
   const plumbing = project?.plumbing ?? [];
   const isRenovation = project?.projectType === "renovation";
 
@@ -132,15 +134,45 @@ export default function OpeningsPage() {
           {/* ── Palette ──────────────────────────────────────────────── */}
           <div>
             <PaletteGroup title={t("Structure")}>
-              {STRUCTURE.map((item) => (
-                <PaletteButton
-                  key={item.kind}
-                  icon={item.icon}
-                  label={item.kind === "door" ? t("Move door") : `${t("Add")} ${t(item.label)}`}
-                  armed={arming === item.kind}
-                  onClick={() => setArming(arming === item.kind ? null : item.kind)}
+              {STRUCTURE.map((item) => {
+                const blocked = item.kind === "window" && noWindow;
+                return (
+                  <PaletteButton
+                    key={item.kind}
+                    icon={item.icon}
+                    label={item.kind === "door" ? t("Move door") : `${t("Add")} ${t(item.label)}`}
+                    armed={arming === item.kind && !blocked}
+                    disabled={blocked}
+                    onClick={() => {
+                      if (blocked) return;
+                      setArming(arming === item.kind ? null : item.kind);
+                    }}
+                  />
+                );
+              })}
+
+              {/* Plenty of bathrooms have no window. Without somewhere to say
+                  so, the only way to answer is to leave the step looking
+                  unfinished and hope that reads as deliberate. */}
+              <label className="mt-2 flex cursor-pointer items-start gap-2.5 rounded-xl border border-hairline bg-surface-raised p-3 text-left transition-colors hover:border-brand/40">
+                <input
+                  type="checkbox"
+                  checked={noWindow}
+                  onChange={(e) => {
+                    setNoWindow(e.target.checked);
+                    if (e.target.checked && arming === "window") setArming(null);
+                  }}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-brand)]"
                 />
-              ))}
+                <span>
+                  <span className="block text-[13.5px] font-medium text-ink">
+                    {t("This bathroom has no window")}
+                  </span>
+                  <span className="mt-0.5 block text-[12px] leading-relaxed text-body-soft">
+                    {t("We’ll plan for ventilation instead.")}
+                  </span>
+                </span>
+              </label>
             </PaletteGroup>
 
             <PaletteGroup title={t("Plumbing")}>
@@ -260,25 +292,30 @@ function PaletteButton({
   label,
   armed,
   onClick,
+  disabled = false,
 }: {
   icon: Parameters<typeof Icon>[0]["name"];
   label: string;
   armed: boolean;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-pressed={armed}
       className={[
         "flex w-full items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left text-[14px] font-medium transition-colors",
-        armed
-          ? "border-brand bg-wash text-brand"
-          : "border-hairline bg-surface-raised text-ink hover:border-brand/45 hover:bg-wash",
+        disabled
+          ? "cursor-not-allowed border-hairline bg-surface-raised text-body-soft opacity-55"
+          : armed
+            ? "border-brand bg-wash text-brand"
+            : "border-hairline bg-surface-raised text-ink hover:border-brand/45 hover:bg-wash",
       ].join(" ")}
     >
-      <Icon name={icon} size={17} className={armed ? "text-brand" : "text-body-soft"} />
+      <Icon name={icon} size={17} className={armed && !disabled ? "text-brand" : "text-body-soft"} />
       {label}
     </button>
   );

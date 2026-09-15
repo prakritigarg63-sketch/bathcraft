@@ -66,6 +66,7 @@ interface ProjectState {
   addExtraOpening: (opening: ExtraOpening) => void;
   updateExtraOpening: (id: string, patch: Partial<ExtraOpening>) => void;
   removeExtraOpening: (id: string) => void;
+  setNoWindow: (value: boolean) => void;
   addPlumbingPoint: (point: PlumbingPoint) => void;
   movePlumbingPoint: (id: string, wall: PlumbingPoint["wall"], offsetInches: number) => void;
   removePlumbingPoint: (id: string) => void;
@@ -256,6 +257,19 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       mutate((p) => ({
         ...p,
         extraOpenings: (p.extraOpenings ?? []).filter((o) => o.id !== id),
+      }));
+    },
+
+    /** Declaring "no window" also drops any already placed, so the plan and the
+     *  declaration cannot disagree. Vents are left alone — a windowless
+     *  bathroom is exactly the one most likely to need one. */
+    setNoWindow(value) {
+      mutate((p) => ({
+        ...p,
+        noWindow: value,
+        extraOpenings: value
+          ? (p.extraOpenings ?? []).filter((o) => o.kind !== "window")
+          : (p.extraOpenings ?? []),
       }));
     },
 
